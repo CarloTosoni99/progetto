@@ -331,8 +331,8 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
     public static void main (String[] args)
     {
 
-        long inizio = System.currentTimeMillis();
 
+        long inizio2 = System.currentTimeMillis();
         int rows,cols,isHexagonal;
         long seed;
         if (args.length != 4)
@@ -393,7 +393,10 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
                     }
                 }
             }
+            long inizio = System.currentTimeMillis();
             Edge[] result = graph.KruskalMST();
+            long fine = System.currentTimeMillis();
+            System.out.println( fine - inizio );
             int[][] conf = assegnaNumero( result, rows, cols );
             print_svg(conf,OUT_FILE);
         }
@@ -430,8 +433,8 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
             print_svgQ(conf,OUT_FILE);
 
         }
-        long fine = System.currentTimeMillis();
-        System.out.println( fine - inizio );
+        long fine2 = System.currentTimeMillis();
+        System.out.println( fine2 - inizio2 );
 
     }
 }
