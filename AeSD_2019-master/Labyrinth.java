@@ -2,20 +2,25 @@
 import java.util.*;
 import java.io.*;
 
-class Labirinth {
+class Labyrinth {
 
-public static final String OUT_FILE = "labirinth.svg";
-public static final String DEFINITIONS = "hex_definitions.txt";
-public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
+    //Sets output files names
+    public static final String OUT_FILE = "Labyrinth.svg";
+    public static final String HEX_DEFINITIONS = "hex_definitions.txt";
+    public static final String SQUARE_DEFINITIONS = "square_definitions.txt";
 
+    //Transforms coordinates to a single integer id
     private static int coord_to_id(int i, int j, int cols){
         return i*cols+j;
     }
 
+    //Transforms id to coordinates
     private static int[] id_to_coord(int id, int cols){
         return new int[]{id/cols,id%cols};
     }
-    private static int[] guardaLatoQ ( int id1, int id2, int rows, int cols ){
+
+    //Returns what sides are connected between two squares
+    private static int[] findConnectionSquare(int id1, int id2, int rows, int cols ){
         int i1, i2, j1, j2;
         int[] tmp;
         tmp = id_to_coord( id1, cols );
@@ -24,7 +29,6 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
         tmp = id_to_coord( id2, cols );
         i2 = tmp[0];
         j2 = tmp[1];
-
 
         if ( j1 == j2 ){
             if ( i1 - 1 == i2 ){
@@ -44,11 +48,139 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
             }
         }
     }
-    private static void print_svgQ(int[][] conf, String fout){
+
+    //Returns what sides are connected between two hexagons
+    private static int[] findConnectionHex(int id1, int id2 , int rows, int cols ){
+        int i1, i2, j1, j2;
+        int[] tmp;
+        tmp = id_to_coord( id1,cols );
+        i1 = tmp[0];
+        j1 = tmp[1];
+        tmp = id_to_coord( id2,cols );
+        i2 = tmp[0];
+        j2 = tmp[1];
+
+        if ( j1 == j2 ){
+            if ( i1 + 1 == i2 ){
+                return new int[]{3,0};
+            }
+            else {
+                return new int[]{0,3};
+            }
+        }
+        else if ( j1 % 2 == 0 ){
+            if ( i1 == i2 ){
+                if ( j1 + 1 == j2 ){
+                    return new int[]{4,1};
+                }
+                else {
+                    return new int[]{2,5};
+                }
+            }
+            else {
+                if ( j1 - 1 == j2 ){
+                    return new int[]{1,4};
+                }
+                else {
+                    return new int[]{5,2};
+                }
+            }
+        }
+        else {
+            if ( i1 == i2 ){
+                if ( j1 + 1 == j2 ){
+                    return new int[]{5,2};
+                }
+                else {
+                    return new int[]{1,4};
+                }
+            }
+            else{
+                if ( j1 - 1 == j2 ){
+                    return new int[]{2,5};
+                }
+                else {
+                    return new int[]{4,1};
+                }
+            }
+        }
+    }
+
+    //Assigns a value to every vertex of the graph (see Tesina file)
+    private static int[][] assignValueSquare(Edge[] result, int rows, int cols ){
+
+        int[][] numero = new int[rows][cols];
+
+        for ( int i = 0; i < rows; ++i ){
+            for ( int j = 0; j < cols; ++j ){
+                numero[i][j] = 15;
+            }
+        }
+
+        for ( int i = 0; i < result.length - 1; ++i ){
+            int v1 = result[i].src;
+            int v2 = result[i].dest;
+
+            int[] confine = findConnectionSquare( v1, v2, rows, cols );
+
+            numero[v1/cols][v1%cols] &= ~( 1 << confine[0] );
+            numero[v2/cols][v2%cols] &= ~( 1 << confine[1] );
+        }
+
+        numero[0][0] -= 1;
+        numero[rows-1][cols-1] -= 4;
+
+        /*
+        for( int i = 0; i < rows; ++i ){
+            for ( int j = 0; j < cols; ++j ){
+                System.out.println( "Peso nodo coordinate (" + i +", " + j + ") = " + numero[i][j]);
+            }
+        }
+        */
+
+        return numero;
+    }
+
+    //Assigns a number to every vertex of the graph (see Tesina file)
+    private static int[][] assignValueHex(Edge[] result, int rows, int cols){
+
+        int[][] numero = new int[rows][cols];
+
+        for ( int i = 0; i < rows; ++i ){
+            for ( int j = 0; j < cols; ++j ){
+                numero[i][j] = 63;
+            }
+        }
+
+        for ( int i = 0; i < result.length - 1; ++i ){
+            int v1 = result[i].src;
+            int v2 = result[i].dest;
+
+            int[] confine = findConnectionHex( v1, v2, rows, cols );
+
+            numero[v1/cols][v1%cols] &= ~( 1 << confine[0] );
+            numero[v2/cols][v2%cols] &= ~( 1 << confine[1] );
+
+        }
+
+        numero[0][0] -= 1;
+        numero[rows - 1][cols - 1] -= 8;
+
+        /*for ( int i = 0; i < rows; ++i ){
+            for ( int j = 0; j < cols; ++j ){
+                System.out.println("peso nodo coordinate (" + i + " " + j + ") = " + numero[i][j]);
+            }
+        }*/
+
+        return numero;
+    }
+
+    //Draws the output labyrinth (square type) in a SVG file
+    private static void printSvgSquare(int[][] conf, String fout){
         BufferedReader br = null;
         FileWriter fw = null;
         try{
-            br = new BufferedReader(new FileReader(DEFINITIONSQ));
+            br = new BufferedReader(new FileReader(SQUARE_DEFINITIONS));
             fw = new FileWriter(OUT_FILE);
 
             int rows, cols, dimX, dimY;
@@ -94,7 +226,8 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
                     fw.flush();
                 }
             }
-            //last arrow
+
+            //draw exit arrow
             fw.write("<use xlink:href=\"#down\" transform=\"translate(");
             fw.write(String.valueOf(x_svg-3.5));
             fw.write(",");
@@ -102,10 +235,9 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
             fw.write(")\"/>\n");
             fw.flush();
 
-            //end file
+            //print last line and close file
             fw.write("</g></svg>\n");
             fw.flush();
-
             br.close();
             fw.close();
 
@@ -116,11 +248,13 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
             ioe.printStackTrace();
         }
     }
-    private static void print_svg(int[][] conf, String fout){
+
+    //Draws the output labyrinth (square type) in a SVG file
+    private static void printSvgHex(int[][] conf, String fout){
         BufferedReader br = null;
         FileWriter fw = null;
         try{
-            br = new BufferedReader(new FileReader(DEFINITIONS));
+            br = new BufferedReader(new FileReader(HEX_DEFINITIONS));
             fw = new FileWriter(OUT_FILE);
 
             int rows, cols, dimX, dimY;
@@ -171,7 +305,6 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
                 }
             }
 
-
             //last arrow
             fw.write("<use xlink:href=\"#down\" transform=\"translate(");
             fw.write(String.valueOf(x_svg-3.5));
@@ -193,162 +326,32 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
         }
     }
 
-
-    private static int[] guardaLato ( int id1, int id2 , int rows, int cols ){
-        int i1, i2, j1, j2;
-        int[] tmp;
-        tmp = id_to_coord( id1,cols );
-        i1 = tmp[0];
-        j1 = tmp[1];
-        tmp = id_to_coord( id2,cols );
-        i2 = tmp[0];
-        j2 = tmp[1];
-
-        if ( j1 == j2 ){
-            if ( i1 + 1 == i2 ){
-                return new int[]{3,0};
-            }
-            else {
-                return new int[]{0,3};
-            }
-
-        }
-
-        else if ( j1 % 2 == 0 ){
-            if ( i1 == i2 ){
-                if ( j1 + 1 == j2 ){
-                    return new int[]{4,1};
-
-                }
-                else {
-                    return new int[]{2,5};
-                }
-            }
-
-
-            else {
-                if ( j1 - 1 == j2 ){
-                    return new int[]{1,4};
-                }
-                else {
-                    return new int[]{5,2};
-                }
-            }
-        }
-
-        else {
-            if ( i1 == i2 ){
-                if ( j1 + 1 == j2 ){
-                    return new int[]{5,2};
-                }
-                else {
-                    return new int[]{1,4};
-                }
-            }
-
-            else{
-                if ( j1 - 1 == j2 ){
-                    return new int[]{2,5};
-                }
-
-                else {
-                    return new int[]{4,1};
-                }
-            }
-
-        }
-    }
-
-    private static int[][] assegnaNumeroQ ( Edge[] result, int rows, int cols ){
-
-        int[][] numero = new int[rows][cols];
-
-        for ( int i = 0; i < rows; ++i ){
-            for ( int j = 0; j < cols; ++j ){
-                numero[i][j] = 15;
-            }
-        }
-
-        for ( int i = 0; i < result.length - 1; ++i ){
-            int v1 = result[i].src;
-            int v2 = result[i].dest;
-
-            int[] confine = guardaLatoQ ( v1, v2, rows, cols );
-
-            numero[v1/cols][v1%cols] &= ~( 1 << confine[0] );
-            numero[v2/cols][v2%cols] &= ~( 1 << confine[1] );
-        }
-
-        numero[0][0] -= 1;
-        numero[rows - 1][cols - 1] -= 4;
-
-        /*for( int i = 0; i < rows; ++i ){
-            for ( int j = 0; j < cols; ++j ){
-                System.out.println( "Peso nodo coordinate (" + i +", " + j + ") = " + numero[i][j]);
-            }
-        }*/
-
-
-
-        return numero;
-    }
-
-    private static int[][] assegnaNumero ( Edge[] result, int rows, int cols){
-
-        int[][] numero = new int[rows][cols];
-
-        for ( int i = 0; i < rows; ++i ){
-            for ( int j = 0; j < cols; ++j ){
-                numero[i][j] = 63;
-            }
-        }
-
-        for ( int i = 0; i < result.length - 1; ++i ){
-            int v1 = result[i].src;
-            int v2 = result[i].dest;
-
-            int[] confine = guardaLato ( v1, v2, rows, cols );
-
-            numero[v1/cols][v1%cols] &= ~( 1 << confine[0] );
-            numero[v2/cols][v2%cols] &= ~( 1 << confine[1] );
-
-        }
-
-        numero[0][0] -= 1;
-        numero[rows - 1][cols - 1] -= 8;
-
-        /*for ( int i = 0; i < rows; ++i ){
-            for ( int j = 0; j < cols; ++j ){
-                System.out.println("peso nodo coordinate (" + i + " " + j + ") = " + numero[i][j]);
-            }
-        }*/
-        return numero;
-
-
-    }
-
     // Driver Program
     public static void main (String[] args)
     {
 
+        //Timing variables
+        long startMillis=0, endMillis=0;
+        //startMillis = System.currentTimeMillis();
 
-        long inizio2 = System.currentTimeMillis();
-        int rows,cols,isHexagonal;
+        int rows, cols, isHexagonal;
         long seed;
+
+        //Checks if all arguments are present
         if (args.length != 4)
         {
-            System.out.println("Usage is: "+ Labirinth.class.getName()+" <rows> <cols> <seed> <isHexagonal>");
+            System.out.println("Usage is: "+ Labyrinth.class.getName()+" <rows> <cols> <seed> <isHexagonal>");
             return;
-        } else
-        {
-                rows = Integer.valueOf(args[0]);
-                cols = Integer.valueOf(args[1]);
-                seed = Long.valueOf(args[2]);
-                isHexagonal = Integer.valueOf(args[3]);
         }
+
+        rows = Integer.valueOf(args[0]);
+        cols = Integer.valueOf(args[1]);
+        seed = Long.valueOf(args[2]);
+        isHexagonal = Integer.valueOf(args[3]);
 
         Random random = new Random(seed);
 
+        //Routine for hexagonal labyrinths
         if ( isHexagonal == 1 )
         {
 
@@ -356,13 +359,12 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
             int E = V*3;  // Number of edges in graph
             Graph graph = new Graph(V, E);
 
+            //Generates all edges between adjacent vertices
             int num_edge = 0;
             for (int r=0;r<rows;r++){
                 for (int c=0;c<cols;c++){
                     int v1,v2;
                     v1 = coord_to_id(r,c,cols);
-
-                    //R-1,C
                     if(r>0){
                         v2 = coord_to_id(r-1,c,cols);
                         graph.edge[num_edge].src = v1;
@@ -393,21 +395,26 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
                     }
                 }
             }
-            long inizio = System.currentTimeMillis();
+
+            //Generates MST and calculates time
+            startMillis = System.currentTimeMillis();
             Edge[] result = graph.KruskalMST();
-            long fine = System.currentTimeMillis();
-            System.out.println( fine - inizio );
-            int[][] conf = assegnaNumero( result, rows, cols );
-            print_svg(conf,OUT_FILE);
+            endMillis = System.currentTimeMillis();
+
+            //Draws labyrinth
+            int[][] conf = assignValueHex( result, rows, cols );
+            printSvgHex(conf,OUT_FILE);
         }
 
-        if ( isHexagonal == 0 ){
+        //Routine for square labyrinths
+        else if ( isHexagonal == 0 ){
 
             int V = rows*cols;
             int E = V*2;
             Graph graph = new Graph(V, E);
-            int num_edge = 0;
 
+            //Generates all edges between adjacent vertices
+            int num_edge = 0;
             for (int r = 0; r < rows; ++r){
                 for (int c = 0; c < cols; ++c){
                     int v1, v2;
@@ -428,13 +435,21 @@ public static final String DEFINITIONSQ = "hex_definitionsQ.txt";
                     }
                 }
             }
-            Edge[] result = graph.KruskalMST();
-            int[][] conf  = assegnaNumeroQ ( result, rows, cols );
-            print_svgQ(conf,OUT_FILE);
 
+            //Generates MST
+            //startMillis = System.currentTimeMillis();
+            Edge[] result = graph.KruskalMST();
+            //endMillis = System.currentTimeMillis();
+
+            //Draws labyrinth
+            int[][] conf  = assignValueSquare( result, rows, cols );
+            printSvgSquare(conf,OUT_FILE);
         }
-        long fine2 = System.currentTimeMillis();
-        System.out.println( fine2 - inizio2 );
+
+        //endMillis = System.currentTimeMillis();
+        //System.out.println( endMillis - startMillis );
+
+        System.out.println("Done\n");
 
     }
 }
